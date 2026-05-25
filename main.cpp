@@ -20,7 +20,7 @@ class BST {
 private:
     Node* root;
 
-    // Helper: insert value into subtree rooted at node
+    // Insert helper
     Node* insert(Node* node, int value) {
         if (node == nullptr) {
             return new Node(value);
@@ -30,11 +30,10 @@ private:
         } else if (value > node->data) {
             node->right = insert(node->right, value);
         }
-        // duplicates ignored
-        return node;
+        return node; // duplicates ignored
     }
 
-    // Helper: search for value in subtree rooted at node
+    // Search helper
     bool contains(Node* node, int value) const {
         if (node == nullptr) return false;
         if (value == node->data) return true;
@@ -42,7 +41,53 @@ private:
         return contains(node->right, value);
     }
 
-    // Helper: print tree sideways
+    // Find minimum node (successor helper)
+    Node* findMin(Node* node) {
+        while (node && node->left != nullptr) {
+            node = node->left;
+        }
+        return node;
+    }
+
+    // Remove helper
+    Node* remove(Node* node, int value) {
+        if (node == nullptr) return nullptr;
+
+        if (value < node->data) {
+            node->left = remove(node->left, value);
+        } else if (value > node->data) {
+            node->right = remove(node->right, value);
+        } else {
+            // Found node to delete
+
+            // Case 1: no children
+            if (node->left == nullptr && node->right == nullptr) {
+                delete node;
+                return nullptr;
+            }
+            // Case 2: one child (right only)
+            else if (node->left == nullptr) {
+                Node* temp = node->right;
+                delete node;
+                return temp;
+            }
+            // Case 2: one child (left only)
+            else if (node->right == nullptr) {
+                Node* temp = node->left;
+                delete node;
+                return temp;
+            }
+            // Case 3: two children
+            else {
+                Node* succ = findMin(node->right);
+                node->data = succ->data;
+                node->right = remove(node->right, succ->data);
+            }
+        }
+        return node;
+    }
+
+    // Print helper
     void printTree(Node* node, int depth) const {
         if (node == nullptr) return;
 
@@ -55,7 +100,7 @@ private:
         printTree(node->left, depth + 1);
     }
 
-    // Helper: delete all nodes
+    // Destructor helper
     void clear(Node* node) {
         if (node == nullptr) return;
         clear(node->left);
@@ -84,6 +129,15 @@ public:
         return contains(root, value);
     }
 
+    // Public remove
+    void remove(int value) {
+        if (!contains(value)) {
+            cout << "Value " << value << " not found in tree.\n";
+            return;
+        }
+        root = remove(root, value);
+    }
+
     // Public print
     void print() const {
         if (root == nullptr) {
@@ -93,7 +147,7 @@ public:
         }
     }
 
-    // NEW: Load numbers from file
+    // Load numbers from file
     void loadFromFile(const string& filename) {
         ifstream file(filename);
         if (!file) {
@@ -120,10 +174,11 @@ int main() {
     while (true) {
         cout << "Menu:\n";
         cout << " 1) Insert numbers (space-separated)\n";
-        cout << " 2) Search for a number\n";
-        cout << " 3) Print tree\n";
-        cout << " 4) Load numbers from numbers.txt\n";
-        cout << " 5) Quit\n";
+        cout << " 2) Load numbers from numbers.txt\n";
+        cout << " 3) Search for a number\n";
+        cout << " 4) Print tree\n";
+        cout << " 5) Remove a number\n";
+        cout << " 6) Quit\n";
         cout << "Enter choice: ";
 
         if (!(cin >> choice)) {
@@ -145,6 +200,10 @@ int main() {
             cout << "Numbers inserted.\n\n";
 
         } else if (choice == 2) {
+            tree.loadFromFile("numbers.txt");
+            cout << endl;
+
+        } else if (choice == 3) {
             cout << "Enter number to search for: ";
             int value;
             if (cin >> value) {
@@ -160,17 +219,25 @@ int main() {
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
             cout << endl;
 
-        } else if (choice == 3) {
+        } else if (choice == 4) {
             cout << "Current tree (rotated 90 degrees counterclockwise):\n";
             tree.print();
             cout << endl;
 
-        } else if (choice == 4) {
-            tree.loadFromFile("numbers.txt");
+        } else if (choice == 5) {
+            cout << "Enter number to remove: ";
+            int value;
+            if (cin >> value) {
+                tree.remove(value);
+            } else {
+                cout << "Invalid number.\n";
+                cin.clear();
+            }
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
             cout << endl;
 
-        } else if (choice == 5) {
-            cout << "Goodbye.\n";
+        } else if (choice == 6) {
+            cout << "Quiting.\n";
             break;
 
         } else {
