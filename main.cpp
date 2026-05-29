@@ -1,247 +1,239 @@
 #include <iostream>
-#include <sstream>
-#include <string>
 #include <fstream>
-#include <limits>
-
 using namespace std;
 
-// Node structure for the binary search tree
-struct Node {
-    int data;
-    Node* left;
-    Node* right;
+enum Color { RED, BLACK };
 
-    Node(int value) : data(value), left(nullptr), right(nullptr) {}
+// Node structure for the Red-Black Tree
+struct Node {
+    int key;
+    Color color;
+    Node *left, *right, *parent;
+
+    Node(int k)
+        : key(k), color(RED), left(nullptr), right(nullptr), parent(nullptr) {}
 };
 
-// Binary Search Tree class
-class BST {
+class RBTree {
 private:
     Node* root;
 
-    // Insert helper
-    Node* insert(Node* node, int value) {
-        if (node == nullptr) {
-            return new Node(value);
-        }
-        if (value < node->data) {
-            node->left = insert(node->left, value);
-        } else if (value > node->data) {
-            node->right = insert(node->right, value);
-        }
-        return node; // duplicates ignored
+    // -------- LEFT ROTATION --------
+    void rotateLeft(Node* x) {
+        Node* y = x->right;
+        x->right = y->left;
+
+        if (y->left)
+            y->left->parent = x;
+
+        y->parent = x->parent;
+
+        if (!x->parent)
+            root = y;
+        else if (x == x->parent->left)
+            x->parent->left = y;
+        else
+            x->parent->right = y;
+
+        y->left = x;
+        x->parent = y;
     }
 
-    // Search helper
-    bool contains(Node* node, int value) const {
-        if (node == nullptr) return false;
-        if (value == node->data) return true;
-        if (value < node->data) return contains(node->left, value);
-        return contains(node->right, value);
+    // -------- RIGHT ROTATION --------
+    void rotateRight(Node* x) {
+        Node* y = x->left;
+        x->left = y->right;
+
+        if (y->right)
+            y->right->parent = x;
+
+        y->parent = x->parent;
+
+        if (!x->parent)
+            root = y;
+        else if (x == x->parent->right)
+            x->parent->right = y;
+        else
+            x->parent->left = y;
+
+        y->right = x;
+        x->parent = y;
     }
 
-    // Find minimum node (successor helper)
-    Node* findMin(Node* node) {
-        while (node && node->left != nullptr) {
-            node = node->left;
-        }
-        return node;
-    }
+    // -------- FIX TREE AFTER INSERT --------
+    void fixInsert(Node* z) {
+        // Continue fixing while parent is RED (violates RB rules)
+        while (z->parent && z->parent->color == RED) {
+            Node* gp = z->parent->parent; // grandparent
 
-    // Remove helper
-    Node* remove(Node* node, int value) {
-        if (node == nullptr) return nullptr;
+            // Parent is left child of grandparent
+            if (z->parent == gp->left) {
+                Node* uncle = gp->right;
 
-        if (value < node->data) {
-            node->left = remove(node->left, value);
-        } else if (value > node->data) {
-            node->right = remove(node->right, value);
-        } else {
-            // Found node to delete
-
-            // Case 1: no children
-            if (node->left == nullptr && node->right == nullptr) {
-                delete node;
-                return nullptr;
+                // Case 1: Uncle is RED → recolor
+                if (uncle && uncle->color == RED) {
+                    z->parent->color = BLACK;
+                    uncle->color = BLACK;
+                    gp->color = RED;
+                    z = gp; // move up the tree
+                }
+                else {
+                    // Case 2: z is right child → rotate left
+                    if (z == z->parent->right) {
+                        z = z->parent;
+                        rotateLeft(z);
+                    }
+                    // Case 3: z is left child → rotate right
+                    z->parent->color = BLACK;
+                    gp->color = RED;
+                    rotateRight(gp);
+                }
             }
-            // Case 2: one child (right only)
-            else if (node->left == nullptr) {
-                Node* temp = node->right;
-                delete node;
-                return temp;
-            }
-            // Case 2: one child (left only)
-            else if (node->right == nullptr) {
-                Node* temp = node->left;
-                delete node;
-                return temp;
-            }
-            // Case 3: two children
             else {
-                Node* succ = findMin(node->right);
-                node->data = succ->data;
-                node->right = remove(node->right, succ->data);
+                // Mirror cases for right side
+                Node* uncle = gp->left;
+
+                if (uncle && uncle->color == RED) {
+                    z->parent->color = BLACK;
+                    uncle->color = BLACK;
+                    gp->color = RED;
+                    z = gp;
+                }
+                else {
+                    if (z == z->parent->left) {
+                        z = z->parent;
+                        rotateRight(z);
+                    }
+                    z->parent->color = BLACK;
+                    gp->color = RED;
+                    rotateLeft(gp);
+                }
             }
         }
-        return node;
+
+        // Root must always be BLACK
+        root->color = BLACK;
     }
 
-    // Print helper
-    void printTree(Node* node, int depth) const {
-        if (node == nullptr) return;
+    // -------- PRINT TREE (SIDEWAYS) --------
+    void printHelper(Node* node, int indent) {
+        if (!node) return;
 
-        printTree(node->right, depth + 1);
+        indent += 6;
 
-        for (int i = 0; i < depth; ++i)
-            cout << "    ";
-        cout << node->data << endl;
+        printHelper(node->right, indent);
 
-        printTree(node->left, depth + 1);
-    }
+        cout << endl;
+        for (int i = 6; i < indent; i++)
+            cout << " ";
 
-    // Destructor helper
-    void clear(Node* node) {
-        if (node == nullptr) return;
-        clear(node->left);
-        clear(node->right);
-        delete node;
+        // Show key, color, and parent key (or N for null)
+        cout << node->key
+             << (node->color == RED ? "(R)" : "(B)")
+             << " [P:";
+        if (node->parent)
+            cout << node->parent->key;
+        else
+            cout << "N";
+        cout << "]";
+
+        printHelper(node->left, indent);
     }
 
 public:
-    BST() : root(nullptr) {}
+    RBTree() : root(nullptr) {}
 
-    ~BST() {
-        clear(root);
-    }
-
-    // Public insert
-    void insert(int value) {
-        if (value < 1 || value > 999) {
-            cout << "Value " << value << " is out of range (1-999). Ignored.\n";
+    // -------- INSERT A NEW KEY (1–999) --------
+    void insert(int key) {
+        if (key < 1 || key > 999) {
+            cout << "Ignoring invalid key (must be 1–999): " << key << endl;
             return;
         }
-        root = insert(root, value);
-    }
 
-    // Public search
-    bool contains(int value) const {
-        return contains(root, value);
-    }
+        Node* z = new Node(key);
+        Node* y = nullptr;
+        Node* x = root;
 
-    // Public remove
-    void remove(int value) {
-        if (!contains(value)) {
-            cout << "Value " << value << " not found in tree.\n";
-            return;
+        // Standard BST insert
+        while (x != nullptr) {
+            y = x;
+            if (z->key < x->key)
+                x = x->left;
+            else
+                x = x->right;
         }
-        root = remove(root, value);
+
+        z->parent = y;
+
+        if (!y)
+            root = z; // tree was empty
+        else if (z->key < y->key)
+            y->left = z;
+        else
+            y->right = z;
+
+        // Fix Red-Black Tree properties
+        fixInsert(z);
     }
 
-    // Public print
-    void print() const {
-        if (root == nullptr) {
-            cout << "(empty tree)\n";
-        } else {
-            printTree(root, 0);
-        }
-    }
-
-    // Load numbers from file
-    void loadFromFile(const string& filename) {
+    // -------- READ NUMBERS FROM FILE --------
+    void readFromFile(const string& filename) {
         ifstream file(filename);
         if (!file) {
-            cout << "Could not open file: " << filename << endl;
+            cout << "Error: Could not open " << filename << endl;
             return;
         }
 
         int value;
         while (file >> value) {
-            insert(value);
+            insert(value); // Insert each number from file
         }
 
-        cout << "Loaded numbers from " << filename << endl;
+        cout << "Finished reading from " << filename << endl;
+    }
+
+    // -------- PUBLIC PRINT --------
+    void print() {
+        cout << "\n===== TREE =====\n";
+        printHelper(root, 0);
+        cout << "\n================\n";
     }
 };
 
 int main() {
-    BST tree;
-    int choice = 0;
-
-    cout << "Binary Search Tree Program\n";
-    cout << "Values must be between 1 and 999.\n\n";
+    RBTree tree;
+    int choice;
 
     while (true) {
-        cout << "Menu:\n";
-        cout << " 1) Insert numbers (space-separated)\n";
-        cout << " 2) Load numbers from numbers.txt\n";
-        cout << " 3) Search for a number\n";
-        cout << " 4) Print tree\n";
-        cout << " 5) Remove a number\n";
-        cout << " 6) Quit\n";
-        cout << "Enter choice: ";
-
+        cout << "\n--- Red-Black Tree Menu ---\n";
+        cout << "1. Add a number\n";
+        cout << "2. Read numbers from numbers.txt\n";
+        cout << "3. Print tree\n";
+        cout << "4. Quit\n";
+        cout << "Selection: ";
         if (!(cin >> choice)) {
             cout << "Invalid input. Exiting.\n";
-            break;
+            return 0;
         }
 
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
         if (choice == 1) {
-            cout << "Enter numbers (space-separated, 1-999): ";
-            string line;
-            getline(cin, line);
-            stringstream ss(line);
             int value;
-            while (ss >> value) {
-                tree.insert(value);
-            }
-            cout << "Numbers inserted.\n\n";
-
-        } else if (choice == 2) {
-            tree.loadFromFile("numbers.txt");
-            cout << endl;
-
-        } else if (choice == 3) {
-            cout << "Enter number to search for: ";
-            int value;
-            if (cin >> value) {
-                if (tree.contains(value)) {
-                    cout << value << " is in the tree.\n";
-                } else {
-                    cout << value << " is NOT in the tree.\n";
-                }
-            } else {
-                cout << "Invalid number.\n";
-                cin.clear();
-            }
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            cout << endl;
-
-        } else if (choice == 4) {
-            cout << "Current tree (rotated 90 degrees counterclockwise):\n";
+            cout << "Enter a number (1–999): ";
+            cin >> value;
+            tree.insert(value);
+        }
+        else if (choice == 2) {
+            tree.readFromFile("numbers.txt");
+        }
+        else if (choice == 3) {
             tree.print();
-            cout << endl;
-
-        } else if (choice == 5) {
-            cout << "Enter number to remove: ";
-            int value;
-            if (cin >> value) {
-                tree.remove(value);
-            } else {
-                cout << "Invalid number.\n";
-                cin.clear();
-            }
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            cout << endl;
-
-        } else if (choice == 6) {
-            cout << "Quiting.\n";
+        }
+        else if (choice == 4) {
+            cout << "Goodbye.\n";
             break;
-
-        } else {
-            cout << "Invalid choice.\n\n";
+        }
+        else {
+            cout << "Invalid choice.\n";
         }
     }
 
